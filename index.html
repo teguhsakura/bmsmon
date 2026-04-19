@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#128267; BMS Baterai Dashboard</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="author" content="Teguh Sakura (teguh.sakura@yahoo.com)">
+    <meta name="description" content="Dashboard BMS Monitoring real-time for Huawei and Shoto">
+
+    <script src="./mqttws31.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            padding: 10px;
+            padding-bottom: 100px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: white; margin: 20px 0; font-size: 1.8em; text-align: center; }
+        h2 { font-size: 1.3rem; color: #00ffff; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+
+        .card, .summary-card {
+            background: #1e293b; border-radius: 15px; padding: 20px;
+            margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            border: 1px solid #334151;
+        }
+
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+        .summary-item { text-align: center; padding: 15px; background: #0f172a; border-radius: 10px; border: 1px solid #334155; }
+        .summary-label { color: #94a3b8; font-size: 0.8em; margin-bottom: 5px; }
+        .summary-value { color: #00ffff; font-size: 1.3em; font-weight: bold; }
+
+        .bms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+        .bms-card { background: #1e293b; border-radius: 15px; padding: 18px; border: 1px solid #334151; cursor: pointer; transition: 0.2s; }
+        .bms-card:hover { border-color: #00ffff; transform: translateY(-3px); }
+        .bms-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 12px; }
+        .bms-title { font-weight: bold; color: #00ffff; }
+        .bms-status { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; }
+        .bms-status.offline { background: #ef4444; }
+        .bms-card.offline { opacity: 0.6; }
+
+        .soc-display { font-size: 1.8em; font-weight: bold; text-align: center; margin: 10px 0; color: #fff; }
+        .info-row { display: flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 6px; color: #cbd5e1; }
+        .info-value { color: #fff; font-weight: 600; }
+        .cycle-info { font-size: 0.8em; color: #94a3b8; margin-top: 10px; text-align: center; }
+        .update-time { font-size: 0.7em; color: #64748b; text-align: center; margin-top: 5px; }
+
+        .btn-primary { width: 100%; padding: 16px; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; background: #16a34a;
+         color: white; border: none; border-radius: 12px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary:active { transform: scale(0.98);  background: #15803d; box-shadow: none; }
+
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+        .modal-content { background: #1e293b; margin: 10px auto; width: 95%; max-width: 500px; border-radius: 15px; overflow: hidden; border: 1px solid #334155; display: flex; flex-direction: column; max-height: 90vh; }
+        .modal-header { padding: 15px; background: #334155; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; overflow-y: auto; color: white; flex: 1; overscroll-behavior: contain; }
+
+        .detail-soc { text-align: center; margin-bottom: 20px; background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+        .detail-soc-large { font-size: 2.0em; font-weight: bold; color: white; }
+        .detail-two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .detail-card { background: #0f172a; padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #334155; }
+        .detail-title { color: #667eea; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+        .detail-value-large { font-size: 1.2em; font-weight: bold; color: white; }
+        .detail-row { display: flex; justify-content: space-between; font-size: 0.85em; padding: 5px 8px; border-bottom: 1px solid #e0e0e0; }
+        .detail-row:last-child { border-bottom: none; }
+
+        .cell-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 15px; }
+        .cell-item { background: #1e293b; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #334155; }
+        .cell-num { display: block; font-size: 0.7em; color: #94a3b8; margin-bottom: 3px; }
+        .cell-volt { font-weight: bold; font-family: monospace; }
+
+        .footer { text-align: center; padding: 25px; margin-top: 40px; border-top: 1px solid #334155; color: #94a3b8; }
+        .footer-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 15px; }
+        .footer-links a { color: #00ffff; text-decoration: none; font-weight: 500; font-size: 14px; }
+
+    </style>
+</head>
+<body>
+<body>
+<div id="mqttNameModal" class="modal" style="display:flex; align-items:center; justify-content:center;">
+    <div class="modal-content" style="max-width:350px; padding:20px; text-align:center;">
+        <h3>🔌 Koneksi BMS Monitoring System</h3>
+        <br>
+        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 15px;">Masukkan <b>Nama klien</b> untuk memulai monitoring</p>
+        <input type="text" id="inputMqttName" placeholder="baterai.huawei.001" autofocus
+        style=" width: 100%; padding: 15px; font-size: 18px; font-weight: bold; text-align: center; border-radius: 12px; border: 2px solid #334155;
+        background: #0f172a; color: #00ffff; outline: none; transition: border-color 0.3s; margin-bottom: 20px; ">
+        <br>
+        <button class="btn-primary" onclick="startMonitoring()">Mulai Monitoring</button>
+    </div>
+</div>
+
+<div class="container">
+    <h1>🔋 BMS Monitoring Dashboard</h1>
+    <div class="card">
+        <h2 style="text-align:center">Overall Summary</h2>
+        <div class="summary-grid" id="summary">
+            <div class="summary-item"><div class="summary-label">Avg Voltage</div><div class="summary-value">-</div></div>
+            <div class="summary-item"><div class="summary-label">Avg SOC</div><div class="summary-value">-</div></div>
+            <div class="summary-item"><div class="summary-label">Total Current</div><div class="summary-value">-</div></div>
+            <div class="summary-item"><div class="summary-label">Total Power</div><div class="summary-value">-</div></div>
+        </div>
+    </div>
+    <div id="bmsGrid" class="bms-grid"></div>
+    <br><br>
+    <div class="card">
+        <div class="summary-grid">
+            <div class="summary-item"><div class="summary-label">Device IP</div><span id="display-ip">---</span></div>
+            <div class="summary-item"><div class="summary-label">WiFi Signal</div><span id="display-wifi">---</span></div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="footer">
+    <p>© 2026 Teguh Sakura</p>
+    <div class="footer-links">
+        <a href='https://teguhsakura.github.io/petunjuk/' target="_blank">&#10145; Tutorial Blynk</a>
+        <a href='mailto:teguh.sakura@yahoo.com' style="color: #00ff00;">✉️ <b>Email Support</b></a>
+        <a href='https://shopee.co.id/teguhfarm' target="_blank">🛒 <b>Shopee</b></a>
+    </div>
+</div>
+
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">BMS Detail</h3>
+            <span style="cursor:pointer; font-size:28px;" onclick="closeModal()">&times;</span>
+        </div>
+        <div id="modalBody" class="modal-body"></div>
+    </div>
+</div>
+
+<script>
+
+let currentData = [];
+let activeBmsIndex = -1;
+let client;
+let mqttName = "";
+
+// Konfigurasi EMQX (Sesuaikan port Websocket)
+const mqttConfig = {
+    server: "broker.emqx.io",
+    port: 8083, // Port Websocket EMQX (bukan 1883)
+    user: "emqx",
+    pass: "public"
+};
+
+function init() {
+    // Modal mqttNameModal otomatis muncul karena style display:flex di atas
+    // Kita tunggu user klik button "HUBUNGKAN" untuk menjalankan startMqtt()
+}
+
+function startMonitoring() {
+    mqttName = document.getElementById('inputMqttName').value.trim();
+    if (!mqttName) return alert("Nama klien tidak boleh kosong!");
+
+    document.getElementById('mqttNameModal').style.display = 'none';
+
+    // Inisialisasi Paho Client
+    const clientId = "web_client_" + Math.random().toString(16).substr(2, 8);
+    client = new Paho.MQTT.Client(mqttConfig.server, mqttConfig.port, clientId);
+
+    // Set callback
+    client.onConnectionLost = onConnectionLost;
+    client.onMessageArrived = onMessageArrived;
+
+    const options = {
+        useSSL: false,
+        userName: mqttConfig.user,
+        password: mqttConfig.pass,
+        onSuccess: onConnect,
+        onFailure: function(e) {
+            alert("Koneksi MQTT Gagal: " + e.errorMessage);
+            document.getElementById('mqttNameModal').style.display = 'flex';
+        }
+    };
+
+    client.connect(options);
+}
+
+function onConnect() {
+    console.log("Connected to MQTT");
+    // Subscribe ke topik sesuai format yang Anda minta
+    const topic = mqttName + "/alldata";
+    client.subscribe(topic);
+    console.log("Subscribed to: " + topic);
+}
+
+function onConnectionLost(responseObject) {
+    if (responseObject.errorCode !== 0) {
+        console.log("Koneksi Hilang: " + responseObject.errorMessage);
+        // Coba hubungkan kembali secara otomatis
+        setTimeout(startMonitoring, 3000);
+    }
+}
+
+function onMessageArrived(message) {
+    try {
+        const data = JSON.parse(message.payloadString);
+
+        // Simpan data ke variabel global agar sinkron dengan fungsi update lama Anda
+        currentData = data.bmsList;
+
+        // Panggil fungsi update UI yang sudah Anda buat sebelumnya
+        updateSummary(data.summary);
+        updateBMSGrid(data.bmsList);
+
+        // Update Extended Info (ambil dari BMS pertama jika ada)
+        if (data.bmsList && data.bmsList.length > 0) {
+            document.getElementById('display-ip').textContent = data.bmsList[0].alamatip || '---';
+            document.getElementById('display-wifi').textContent = (data.bmsList[0].sinyalwifi || '0') + " dBm";
+        }
+
+        // Update modal detail jika sedang terbuka
+        if (activeBmsIndex !== -1 && currentData[activeBmsIndex]) {
+            renderModal(currentData[activeBmsIndex]);
+        }
+    } catch (e) {
+        console.error("Error parsing MQTT JSON:", e);
+    }
+}
+
+function updateSummary(s) {
+    const data = s || { avgVoltage: 0, avgSOC: 0, totalCurrent: 0, totalPower: 0, onlineCount: 0 };
+    const isOffline = (!data.onlineCount || data.onlineCount === 0);
+
+    document.getElementById('summary').innerHTML = `
+        <div class="summary-item">
+            <div class="summary-label">Avg Voltage</div>
+            <div class="summary-value">${isOffline ? '0.00' : data.avgVoltage.toFixed(2)}V</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Avg SOC</div>
+            <div class="summary-value">${isOffline ? '0' : Math.round(data.avgSOC)}%</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Current</div>
+            <div class="summary-value">${isOffline ? '0.00' : data.totalCurrent.toFixed(2)}A</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-label">Total Power</div>
+            <div class="summary-value">${isOffline ? '0.00' : data.totalPower.toFixed(2)}W</div>
+        </div>
+    `;
+}
+
+function updateBMSGrid(bmsList) {
+    let html = '';
+    bmsList.forEach(bms => {
+        const cardClass = bms.online ? 'bms-card' : 'bms-card offline';
+        const statusClass = bms.online ? 'bms-status' : 'bms-status offline';
+
+        html += `<div class="${cardClass}" onclick="openModal(${bms.index})">`;
+        html += `<div class="bms-header"><div class="bms-title">Alamat #${bms.address}</div><div class="${statusClass}"></div></div>`;
+
+        if (bms.online) {
+            html += `<div class="soc-display">SOC: ${bms.soc}%</div>`;
+            html += `<div class="info-row"><span>🔋 Voltage:</span><span class="info-value">${bms.voltage.toFixed(2)} V</span></div>`;
+            html += `<div class="info-row"><span>⚎ Current:</span><span class="info-value">${bms.current.toFixed(2)} A</span></div>`;
+            html += `<div class="info-row"><span>⚡ Power:</span><span class="info-value">${bms.power.toFixed(1)} W</span></div>`;
+            html += `<div class="info-row"><span>📊 Diff Cell:</span><span class="info-value">${bms.diffCell} mV</span></div>`;
+            html += `<div class="info-row"><span>⬇️ Min Cell:</span><span class="info-value">${bms.minCell.toFixed(3)} V</span></div>`;
+            html += `<div class="info-row"><span>⬆️ Max Cell:</span><span class="info-value">${bms.maxCell.toFixed(3)} V</span></div>`;
+            html += `<div class="cycle-info">Discharge Times: ${bms.dischargeTimes}</div>`;
+            html += `<div class="update-time">⏳ ${bms.lastUpdate}</div>`;
+        } else {
+            html += `<div class="soc-display" style="color: #64748b;">OFFLINE</div>`;
+        }
+        html += `</div>`;
+    });
+    document.getElementById('bmsGrid').innerHTML = html;
+}
+
+function openModal(index) {
+    if (!currentData[index] || !currentData[index].online) {
+        alert("BMS Offline atau data belum tersedia.");
+        return;
+    }
+
+    activeBmsIndex = index;
+    document.getElementById('modalTitle').textContent = `Detail Info #${currentData[index].address}`;
+    document.getElementById('modal').style.display = 'block';
+
+    renderModal(currentData[index]);
+}
+
+function renderModal(data) {
+    if (!data || !data.cells) return;
+
+    let cellsHtml = '';
+    data.cells.forEach((v, i) => {
+    let bg = '';
+
+    if (v >= data.maxCell - 0.001) bg = 'background:#450a0a; border-color:#991b1b;';
+    if (v <= data.minCell + 0.001) bg = 'background:#064e3b; border-color:#065f46;';
+
+    cellsHtml += `
+        <div class="cell-item" style="${bg}">
+            <span class="cell-num">CELL ${i+1}</span>
+            <span class="cell-volt">${v.toFixed(3)}V</span>
+        </div>`;
+    });
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="detail-soc">
+            <div class="detail-soc-large">${data.soc}%</div>
+            <div class="detail-title" style="margin-top:5px;">State of Charge</div>
+            <div style="color:#666;margin-top:5px;">Updated: ${data.lastUpdate}</div>
+        </div>
+
+        <div class="detail-two-column">
+            <div class="detail-card">
+                <div class="detail-title">Discharge Ah</div>
+                <div class="detail-value-large">${data.dischargeAH}Ah</div>
+                <div style="color:#666;margin-top:5px;">Times: ${data.dischargeTimes}x</div>
+            </div>
+            <div class="detail-card">
+                <div class="detail-title">State of Health</div>
+                <div class="detail-value-large">${data.soh}%</div>
+                <div style="color:#666;margin-top:5px;">AVG Cell Temp: ${data.avgCellTemp}°C</div>
+            </div>
+        </div>
+
+        <div class="detail-card" style="margin-bottom:15px;">
+            <div class="detail-row"><span>Pack Voltage:</span><span><strong>${data.voltage.toFixed(2)} V</strong></span></div>
+            <div class="detail-row"><span>Bus Voltage:</span><span><strong>${data.busVoltage.toFixed(2)} V</strong></span></div>
+            <div class="detail-row"><span>Current:</span><span><strong>${data.current.toFixed(2)} A</strong></span></div>
+            <div class="detail-row"><span>Power:</span><span><strong>${data.power.toFixed(2)} W</strong></span></div>
+            <div class="detail-row"><span>Min Cell Voltage:</span><span><strong>${data.minCell.toFixed(3)} V</strong> (Cell ${data.minCellIndex})</span></div>
+            <div class="detail-row"><span>Max Cell Voltage:</span><span><strong>${data.maxCell.toFixed(3)} V</strong> (Cell ${data.maxCellIndex})</span></div>
+            <div class="detail-row"><span>Voltage Difference:</span><span><strong>${data.diffCell} mV</strong></span></div>
+            <div class="detail-row"><span>Voltage Average:</span><span><strong>${data.cellAvg.toFixed(3)} V</strong></span></div>
+        </div>
+        <div class="detail-title" style="margin-top:10px;">Cell Voltages</div>
+        <div class="cell-grid">${cellsHtml}</div>
+        <br><br>
+        <div class="detail-card" style="margin-bottom:15px;">
+            <h2>Cell Temperature</h2>
+            <div class="detail-row"><span>Min Cell Temp:</span><span><strong>${data.minCellTemp} °C</strong></span></div>
+            <div class="detail-row"><span>Max Cell Temp:</span><span><strong>${data.maxCellTemp} °C</strong></span></div>
+            <div class="detail-row"><span>Avg Cell Temp:</span><span><strong>${data.avgCellTemp} °C</strong></span></div>
+        </div>
+    `;
+}
+
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+    activeBmsIndex = -1;
+}
+
+window.onclick = e => { if (e.target.className === 'modal') closeModal(); };
+
+</script>
+</body>
+</html>
