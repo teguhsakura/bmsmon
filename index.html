@@ -10,6 +10,9 @@
 
     <script src="./mqttws31.min.js"></script>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./icons/icon-192x192.png">
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -149,7 +152,7 @@ let mqttName = "";
 // Konfigurasi EMQX (Sesuaikan port Websocket)
 const mqttConfig = {
     server: "broker.emqx.io",
-    port: 8083, // Port Websocket EMQX (bukan 1883)
+    port: 8084,
     user: "emqx",
     pass: "public"
 };
@@ -167,14 +170,14 @@ function startMonitoring() {
 
     // Inisialisasi Paho Client
     const clientId = "web_client_" + Math.random().toString(16).substr(2, 8);
-    client = new Paho.MQTT.Client(mqttConfig.server, mqttConfig.port, clientId);
+    client = new Paho.MQTT.Client(mqttConfig.server, mqttConfig.port, "/mqtt", clientId);
 
     // Set callback
     client.onConnectionLost = onConnectionLost;
     client.onMessageArrived = onMessageArrived;
 
     const options = {
-        useSSL: false,
+        useSSL: true,
         userName: mqttConfig.user,
         password: mqttConfig.pass,
         onSuccess: onConnect,
