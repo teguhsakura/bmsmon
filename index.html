@@ -352,6 +352,11 @@ function renderModal(data) {
             <div class="detail-row"><span>Max Cell Temp:</span><span><strong>${data.maxCellTemp} °C</strong></span></div>
             <div class="detail-row"><span>Avg Cell Temp:</span><span><strong>${data.avgCellTemp} °C</strong></span></div>
         </div>
+        <div class="detail-card" style="margin-bottom:15px;">
+            <h2>Discharge & Charge Limit</h2>
+            <div class="detail-row"><span>Discharge:</span><span><strong>${data.dischargeLimit} A</strong></span></div>
+            <div class="detail-row"><span>Charge:</span><span><strong>${data.chargeLimit} A</strong></span></div>
+        </div>
     `;
 }
 
