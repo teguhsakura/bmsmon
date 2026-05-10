@@ -130,6 +130,9 @@
         <a href='mailto:teguh.sakura@yahoo.com' style="color: #00ff00;">✉️ <b>Email Support</b></a>
         <a href='https://shopee.co.id/teguhfarm' target="_blank">🛒 <b>Shopee</b></a>
     </div>
+    <div style="margin-top: 15px; font-size: 0.9em; color: #00ffff;">
+        Nama Klien: <span id="display-client-name" style="font-weight: bold; color: #fff;">-</span>
+    </div>
 </div>
 
 <div id="modal" class="modal">
@@ -166,6 +169,7 @@ function startMonitoring() {
     mqttName = document.getElementById('inputMqttName').value.trim();
     if (!mqttName) return alert("Nama klien tidak boleh kosong!");
 
+document.getElementById('display-client-name').textContent = mqttName;
     document.getElementById('mqttNameModal').style.display = 'none';
 
     // Inisialisasi Paho Client
